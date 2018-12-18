@@ -23,7 +23,6 @@
 
 #include "IResearchCommon.h"
 #include "IResearchViewCoordinator.h"
-#include "IResearchViewDBServer.h"
 #include "IResearchViewNode.h"
 #include "IResearchViewBlock.h"
 #include "IResearchOrderFactory.h"
@@ -39,8 +38,8 @@
 #include "Basics/StringUtils.h"
 #include "Cluster/ClusterInfo.h"
 #include "StorageEngine/TransactionState.h"
-
 #include "velocypack/Iterator.h"
+#include "VocBase/LogicalCollection.h"
 
 namespace {
 
@@ -49,7 +48,7 @@ using namespace arangodb;
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief surrogate root for all queries without a filter
 ////////////////////////////////////////////////////////////////////////////////
-aql::AstNode const ALL(true, aql::VALUE_TYPE_BOOL);
+aql::AstNode const ALL(arangodb::aql::AstNodeValue(true));
 
 inline bool filterConditionIsEmpty(aql::AstNode const* filterCondition) {
   return filterCondition == &ALL;
@@ -664,7 +663,10 @@ std::unique_ptr<aql::ExecutionBlock> IResearchViewNode::createBlock(
   }
 
   auto& view = *this->view();
-  PrimaryKeyIndexReader* reader;
+  irs::index_reader const* reader;
+
+  LOG_TOPIC(TRACE, arangodb::iresearch::TOPIC)
+    << "Start getting snapshot for view '" << view.name() << "'";
 
   if (ServerState::instance()->isDBServer()) {
     // there are no cluster-wide transactions,
@@ -673,9 +675,24 @@ std::unique_ptr<aql::ExecutionBlock> IResearchViewNode::createBlock(
       IResearchView::Snapshot::FindOrCreate,
       IResearchView::Snapshot::SyncAndReplace
     };
+    std::unordered_set<TRI_voc_cid_t> collections;
+    auto& resolver = engine.getQuery()->resolver();
 
-    reader = LogicalView::cast<IResearchViewDBServer>(view).snapshot(
-      *trx, _shards, SNAPSHOT[size_t(_options.forceSync)]
+    for (auto& shard: _shards) {
+      auto collection = resolver.getCollection(shard);
+
+      if (!collection) {
+        THROW_ARANGO_EXCEPTION(arangodb::Result(
+          TRI_ERROR_ARANGO_DATA_SOURCE_NOT_FOUND,
+          std::string("failed to find shard by id '") + shard + "'"
+        ));
+      }
+
+      collections.emplace(collection->id());
+    }
+
+    reader = LogicalView::cast<IResearchView>(view).snapshot(
+      *trx, SNAPSHOT[size_t(_options.forceSync)], &collections
     );
   } else {
     static IResearchView::Snapshot const SNAPSHOT[] {
@@ -690,7 +707,7 @@ std::unique_ptr<aql::ExecutionBlock> IResearchViewNode::createBlock(
 
   if (!reader) {
     LOG_TOPIC(WARN, arangodb::iresearch::TOPIC)
-      << "failed to get snapshot while creating arangosearch view ExecutionBlock for view '" << view.name() << "' tid '";
+      << "failed to get snapshot while creating arangosearch view ExecutionBlock for view '" << view.name() << "'";
 
     THROW_ARANGO_EXCEPTION_MESSAGE(
       TRI_ERROR_INTERNAL,
@@ -698,18 +715,13 @@ std::unique_ptr<aql::ExecutionBlock> IResearchViewNode::createBlock(
     );
   }
 
+  LOG_TOPIC(TRACE, arangodb::iresearch::TOPIC)
+    << "Finish getting snapshot for view '" << view.name() << "'";
+
   if (_sortCondition.empty()) {
     // unordered case
     return std::make_unique<IResearchViewUnorderedBlock>(*reader, engine, *this);
   }
-
-//FIXME uncomment when the following method will be there:
-// `int getAndSkip(size_t skip, size_t& skipped, size_t read, size_t& count, AqlItemBlock*& res)`
-//
-//  if (!isInInnerLoop()) {
-//    // optimized execution for simple queries
-//    return new IResearchViewOrderedBlock(*reader, engine, *this);
-//  }
 
   // generic case
   return std::make_unique<IResearchViewBlock>(*reader, engine, *this);

@@ -54,10 +54,11 @@ FlushFeature::FlushFeature(application_features::ApplicationServer& server)
 
 void FlushFeature::collectOptions(std::shared_ptr<ProgramOptions> options) {
   options->addSection("server", "Server features");
-  options->addHiddenOption(
+  options->addOption(
       "--server.flush-interval",
       "interval (in microseconds) for flushing data",
-      new UInt64Parameter(&_flushInterval));
+      new UInt64Parameter(&_flushInterval),
+      arangodb::options::makeFlags(arangodb::options::Flags::Hidden));
 }
 
 void FlushFeature::validateOptions(std::shared_ptr<options::ProgramOptions> options) {
@@ -154,15 +155,17 @@ bool FlushFeature::unregisterCallback(void* ptr) {
 void FlushFeature::executeCallbacks() {
   std::vector<FlushTransactionPtr> transactions;
 
-  READ_LOCKER(locker, _callbacksLock);
-  transactions.reserve(_callbacks.size());
+  {
+    READ_LOCKER(locker, _callbacksLock);
+    transactions.reserve(_callbacks.size());
 
-  // execute all callbacks. this will create as many transactions as
-  // there are callbacks
-  for (auto const& cb : _callbacks) {
-    // copy elision, std::move(..) not required
-    LOG_TOPIC(TRACE, arangodb::Logger::FLUSH) << "executing flush callback";
-    transactions.emplace_back(cb.second());
+    // execute all callbacks. this will create as many transactions as
+    // there are callbacks
+    for (auto const& cb: _callbacks) {
+      // copy elision, std::move(..) not required
+      LOG_TOPIC(TRACE, arangodb::Logger::FLUSH) << "executing flush callback";
+      transactions.emplace_back(cb.second());
+    }
   }
 
   // TODO: make sure all data is synced

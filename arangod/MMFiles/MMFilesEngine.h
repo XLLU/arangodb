@@ -240,6 +240,8 @@ class MMFilesEngine final : public StorageEngine {
   // start compactor thread and delete files form collections marked as deleted
   void recoveryDone(TRI_vocbase_t& vocbase) override;
 
+  Result persistLocalDocumentIds(TRI_vocbase_t& vocbase);
+
  private:
   int dropDatabaseMMFiles(TRI_vocbase_t* vocbase);
   std::unique_ptr<TRI_vocbase_t> createDatabaseMMFiles(
@@ -372,19 +374,23 @@ class MMFilesEngine final : public StorageEngine {
   ) override;
 
   arangodb::Result dropView(
-    TRI_vocbase_t& vocbase,
-    LogicalView& view
+    TRI_vocbase_t const& vocbase,
+    LogicalView const& view
   ) override;
 
   void destroyView(
-    TRI_vocbase_t& vocbase,
-    LogicalView& view
+    TRI_vocbase_t const& vocbase,
+    LogicalView const& view
   ) noexcept override;
 
   std::string createViewDirectoryName(std::string const& basePath,
                                       TRI_voc_cid_t id);
 
-  void saveViewInfo(TRI_vocbase_t* vocbase, arangodb::LogicalView const*, bool sync) const;
+  void saveViewInfo(
+    TRI_vocbase_t const& vocbase,
+    LogicalView const& view,
+    bool sync
+  ) const;
 
   void signalCleanup(TRI_vocbase_t& vocbase) override;
 
@@ -445,6 +451,9 @@ class MMFilesEngine final : public StorageEngine {
   void disableCompaction();
   void enableCompaction();
   bool isCompactionDisabled() const;
+
+  /// @brief whether the engine is currently running an upgrade procedure
+  bool upgrading() const;
 
  private:
   velocypack::Builder getReplicationApplierConfiguration(std::string const& filename, int& status);
@@ -615,6 +624,9 @@ class MMFilesEngine final : public StorageEngine {
   // can be called multiple times. the last one to set this to 0 again will
   // enable compaction again
   std::atomic<uint64_t> _compactionDisabled;
+
+  // whether the engine is currently running an upgrade procedure
+  std::atomic<bool> _upgrading{false};
 };
 
 }

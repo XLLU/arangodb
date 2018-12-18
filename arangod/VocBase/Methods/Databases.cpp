@@ -289,7 +289,7 @@ arangodb::Result Databases::create(std::string const& dbName,
   }
 
   if (upgradeRes.fail()) {
-    LOG_TOPIC(ERR, Logger::FIXME) << "Could not create database "
+    LOG_TOPIC(ERR, Logger::FIXME) << "Could not create database: "
     << upgradeRes.errorMessage();
     return upgradeRes;
   }
@@ -345,7 +345,7 @@ namespace  {
       
       vocbase->release();
       // sleep
-      std::this_thread::sleep_for(std::chrono::microseconds(10000));
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return TRI_ERROR_NO_ERROR;
   }

@@ -159,6 +159,7 @@ class Methods {
   /// @param callback nullptr and empty functers are ignored, treated as success
   /// @return success
   bool addStatusChangeCallback(StatusChangeCallback const* callback);
+  bool removeStatusChangeCallback(StatusChangeCallback const* callback);
 
   /// @brief clear all called for LogicalDataSource instance association events
   /// @note not thread-safe on the assumption of static factory registration
@@ -196,6 +197,7 @@ class Methods {
 
   /// @brief add a transaction hint
   void addHint(transaction::Hints::Hint hint) { _localHints.set(hint); }
+  bool hasHint(transaction::Hints::Hint hint) const { return _localHints.has(hint); }
 
   /// @brief whether or not the transaction consists of a single operation only
   bool isSingleOperationTransaction() const;
@@ -324,10 +326,6 @@ class Methods {
   OperationResult truncate(std::string const& collectionName,
                            OperationOptions const& options);
 
-  /// @brief rotate all active journals of the collection
-  OperationResult rotateActiveJournal(std::string const& collectionName,
-                                      OperationOptions const& options);
-
   /// @brief count the number of documents in a collection
   virtual OperationResult count(std::string const& collectionName, CountType type);
 
@@ -442,7 +440,6 @@ class Methods {
 #endif
 
  private:
-
   /// @brief build a VPack object with _id, _key and _rev and possibly
   /// oldRef (if given), the result is added to the builder in the
   /// argument as a single object.
@@ -513,11 +510,10 @@ class Methods {
   OperationResult rotateActiveJournalCoordinator(std::string const& collectionName,
                                                  OperationOptions const& options);
 
-  OperationResult rotateActiveJournalLocal(std::string const& collectionName,
-                                           OperationOptions const& options);
-
-
  protected:
+  /// @brief return the transaction collection for a document collection
+  ENTERPRISE_VIRT TransactionCollection* trxCollection(TRI_voc_cid_t cid,
+                               AccessMode::Type type = AccessMode::Type::READ) const;
 
   OperationResult countCoordinator(std::string const& collectionName,
                                    CountType type);
@@ -526,10 +522,6 @@ class Methods {
       std::shared_ptr<LogicalCollection> const& collinfo, std::string const& collectionName, CountType type);
 
   OperationResult countLocal(std::string const& collectionName, CountType type);
-
-  /// @brief return the transaction collection for a document collection
-  ENTERPRISE_VIRT TransactionCollection* trxCollection(TRI_voc_cid_t cid,
-                               AccessMode::Type type = AccessMode::Type::READ) const;
 
   /// @brief return the collection
   arangodb::LogicalCollection* documentCollection(
@@ -634,6 +626,12 @@ class Methods {
     std::string name;
   }
   _collectionCache;
+
+  Result replicateOperations(
+      LogicalCollection const& collection,
+      std::shared_ptr<const std::vector<std::string>> const& followers,
+      OperationOptions const& options, VPackSlice value,
+      TRI_voc_document_operation_e operation, VPackBuilder& resultBuilder);
 };
 
 }

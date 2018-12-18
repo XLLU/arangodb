@@ -109,7 +109,9 @@ class TailingSyncer : public Syncer {
   Result changeView(arangodb::velocypack::Slice const&);
 
   /// @brief apply a single marker from the continuous log
-  Result applyLogMarker(arangodb::velocypack::Slice const&, TRI_voc_tick_t);
+  Result applyLogMarker(arangodb::velocypack::Slice const& slice, 
+                        TRI_voc_tick_t firstRegularTick,
+                        TRI_voc_tick_t& markerTick);
 
   /// @brief apply the data from the continuous log
   Result applyLog(httpclient::SimpleHttpResult*, TRI_voc_tick_t firstRegularTick, 
@@ -196,6 +198,10 @@ class TailingSyncer : public Syncer {
 
   /// @brief whether or not master & slave can work in parallel
   bool _workInParallel;
+
+  /// @brief max parallel open transactions
+  /// this will be set to false for RocksDB, and to true for MMFiles
+  bool _supportsMultipleOpenTransactions;
 
   /// @brief which transactions were open and need to be treated specially
   std::unordered_map<TRI_voc_tid_t, std::unique_ptr<ReplicationTransaction>>

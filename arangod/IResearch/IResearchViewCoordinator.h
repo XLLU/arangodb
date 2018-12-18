@@ -31,6 +31,12 @@
 #include <velocypack/Slice.h>
 
 namespace arangodb {
+
+struct ViewFactory; // forward declaration
+
+} // arangodb
+
+namespace arangodb {
 namespace iresearch {
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -38,14 +44,9 @@ namespace iresearch {
 /// @brief an abstraction over the distributed IResearch index implementing the
 ///        LogicalView interface
 ///////////////////////////////////////////////////////////////////////////////
-class IResearchViewCoordinator final : public arangodb::LogicalViewClusterInfo {
+class IResearchViewCoordinator final: public arangodb::LogicalView {
  public:
-
-  //////////////////////////////////////////////////////////////////////////////
-  /// @brief remove all documents matching collection 'cid' from this IResearch
-  ///        View
-  //////////////////////////////////////////////////////////////////////////////
-  arangodb::Result drop(TRI_voc_cid_t) noexcept { return arangodb::Result(); } // NOOP since no internal store
+  virtual ~IResearchViewCoordinator();
 
   ////////////////////////////////////////////////////////////////////////////////
   /// @brief acquire locks on the specified 'cid' during read-transactions
@@ -63,47 +64,45 @@ class IResearchViewCoordinator final : public arangodb::LogicalViewClusterInfo {
     arangodb::velocypack::Slice const& value
   );
 
-  ///////////////////////////////////////////////////////////////////////////////
-  /// @brief view factory
-  /// @returns initialized view object
-  ///////////////////////////////////////////////////////////////////////////////
-  static std::shared_ptr<LogicalView> make(
-    TRI_vocbase_t& vocbase,
-    velocypack::Slice const& info,
-    bool isNew,
-    uint64_t planVersion,
-    LogicalView::PreCommitCallback const& preCommit
-  );
-
-  bool visitCollections(CollectionVisitor const& visitor) const override;
+  //////////////////////////////////////////////////////////////////////////////
+  /// @brief the factory for this type of view
+  //////////////////////////////////////////////////////////////////////////////
+  static arangodb::ViewFactory const& factory();
 
   void open() override {
     // NOOP
   }
 
-  Result drop() override;
-
-  virtual Result rename(
-      std::string&& /*newName*/,
-      bool /*doSync*/
-  ) override {
-    // not supported in a cluster
-    return { TRI_ERROR_NOT_IMPLEMENTED };
-  }
-
-  virtual arangodb::Result updateProperties(
+  using LogicalDataSource::properties;
+  virtual arangodb::Result properties(
     velocypack::Slice const& properties,
-    bool partialUpdate,
-    bool doSync
+    bool partialUpdate
   ) override;
 
+  //////////////////////////////////////////////////////////////////////////////
+  /// @brief unlink remove 'cid' from the persisted list of tracked collection
+  ///        IDs
+  /// @return success == view does not track collection
+  //////////////////////////////////////////////////////////////////////////////
+  arangodb::Result unlink(TRI_voc_cid_t cid) noexcept;
+
+  bool visitCollections(CollectionVisitor const& visitor) const override;
+
+
  protected:
-  virtual Result appendVelocyPackDetailed(
-      arangodb::velocypack::Builder& builder,
-      bool forPersistence
+  virtual Result appendVelocyPackImpl(
+    arangodb::velocypack::Builder& builder,
+    bool detailed,
+    bool forPersistence
   ) const override;
 
+  virtual arangodb::Result dropImpl() override;
+
+  arangodb::Result renameImpl(std::string const& oldName) override;
+
  private:
+  struct ViewFactory; // forward declaration
+
   IResearchViewCoordinator(
     TRI_vocbase_t& vocbase, velocypack::Slice info, uint64_t planVersion
   );

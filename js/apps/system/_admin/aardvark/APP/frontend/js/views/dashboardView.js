@@ -727,7 +727,7 @@
           self.updateCharts();
         })
         .error(function (e) {
-          console.log('stat fetch req error:' + e);
+          arangoHelper.arangoError('Statistics', 'stat fetch req error:' + JSON.stringify(e));
         });
     },
 
@@ -759,7 +759,7 @@
           self.history[self.server][figure] = [];
 
           for (i = 0; i < d.times.length; ++i) {
-            self.mergeDygraphHistory(d, i, true);
+            self.mergeDygraphHistory(d, i);
           }
         }
       );
@@ -1069,6 +1069,12 @@
       );
     },
 
+    clearInterval: function () {
+      if (this.timer) {
+        clearInterval(this.timer);
+      }
+    },
+
     resize: function () {
       if (!this.isUpdating) {
         return;
@@ -1088,7 +1094,29 @@
 
     template: templateEngine.createTemplate('dashboardView.ejs'),
 
+    checkEnabledStatistics: function () {
+      if (!frontendConfig.statisticsEnabled || frontendConfig.db !== '_system') {
+        $(this.el).html('');
+        if (this.server) {
+          $(this.el).append(
+            '<div style="color: red">Server statistics (' + this.server + ') are disabled.</div>'
+          );
+        } else {
+          $(this.el).append(
+            '<div style="color: red">Server statistics are disabled.</div>'
+          );
+        }
+        return false;
+      } else {
+        return true;
+      }
+    },
+
     render: function (modalView) {
+      if (!this.checkEnabledStatistics()) {
+        return;
+      }
+
       if (this.serverInfo === undefined) {
         this.serverInfo = {
           isDBServer: false
@@ -1102,20 +1130,6 @@
               hideStatistics: false
             }));
             this.getNodeInfo();
-          }
-
-          if (!enabled || frontendConfig.db !== '_system') {
-            $(this.el).html('');
-            if (this.server) {
-              $(this.el).append(
-                '<div style="color: red">Server statistics (' + this.server + ') are disabled.</div>'
-              );
-            } else {
-              $(this.el).append(
-                '<div style="color: red">Server statistics are disabled.</div>'
-              );
-            }
-            return;
           }
 
           this.prepareDygraphs();

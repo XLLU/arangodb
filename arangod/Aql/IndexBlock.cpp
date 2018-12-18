@@ -158,7 +158,7 @@ arangodb::aql::AstNode* IndexBlock::makeUnique(
     bool isSparse = false;
     auto unused =
         trx->getIndexFeatures(_indexes[_currentIndex], isSorted, isSparse);
-    if (isSparse) {
+    if (isSparse || isSorted) {
       // the index is sorted. we need to use SORTED_UNIQUE to get the
       // result back in index order
       return ast->createNodeFunctionCall(TRI_CHAR_LENGTH_PAIR("SORTED_UNIQUE"),
@@ -186,7 +186,7 @@ void IndexBlock::executeExpressions() {
 
   // modify the existing node in place
   TEMPORARILY_UNLOCK_NODE(condition);
-  
+
   Query* query = _engine->getQuery();
 
   for (size_t posInExpressions = 0;
@@ -211,7 +211,7 @@ void IndexBlock::executeExpressions() {
       // modify the node in place
       TEMPORARILY_UNLOCK_NODE(tmp);
       if (x + 1 < toReplace->indexPath.size()) {
-        AstNode* cpy = old; 
+        AstNode* cpy = old;
         tmp->changeMember(idx, cpy);
         tmp = cpy;
       } else {
@@ -225,7 +225,7 @@ void IndexBlock::executeExpressions() {
 void IndexBlock::initializeOnce() {
   auto en = ExecutionNode::castTo<IndexNode const*>(getPlanNode());
   auto ast = en->_plan->getAst();
-      
+
   _trx->pinData(_collection->id());
 
   // instantiate expressions:

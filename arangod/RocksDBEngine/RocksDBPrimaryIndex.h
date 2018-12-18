@@ -127,9 +127,9 @@ class RocksDBPrimaryIndex final : public RocksDBIndex {
 
   bool canBeDropped() const override { return false; }
 
-  bool hasCoveringIterator() const override { return true; } 
+  bool hasCoveringIterator() const override { return true; }
 
-  bool isSorted() const override { return false; }
+  bool isSorted() const override { return true; }
 
   bool hasSelectivityEstimate() const override { return true; }
 
@@ -145,7 +145,7 @@ class RocksDBPrimaryIndex final : public RocksDBIndex {
   LocalDocumentId lookupKey(transaction::Methods* trx,
                          arangodb::StringRef key) const;
 
-  /// @brief reads a revision id from the primary index 
+  /// @brief reads a revision id from the primary index
   /// if the document does not exist, this function will return false
   /// if the document exists, the function will return true
   /// the revision id will only be non-zero if the primary index

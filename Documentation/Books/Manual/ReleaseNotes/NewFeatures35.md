@@ -5,6 +5,9 @@ The following list shows in detail which features have been added or improved in
 ArangoDB 3.5. ArangoDB 3.5 also contains several bug fixes that are not listed
 here.
 
+* We now make use of the sorted-ness of primary indexes if the RocksDB engine
+  is used.
+
 Internal
 --------
 

@@ -1,6 +1,12 @@
 devel
 -----
 
+* RocksDB primary index can now be used for sorting alphanumerically.
+
+  As keys are strings they are now sorted as strings, an exception in the
+  front-end that treated strings representing numbers differently has been
+  removed. Therefor "10" will be less than "9"
+
 * fixed issue #7743: Query processing discrepancy between Rocks and MMFiles databases
 
   this change enforces the invalidation of variables in AQL queries after usage of

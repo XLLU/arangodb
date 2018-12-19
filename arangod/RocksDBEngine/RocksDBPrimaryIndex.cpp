@@ -29,7 +29,7 @@
 #include "Cache/CachedValue.h"
 #include "Cache/TransactionalCache.h"
 #include "Cluster/ServerState.h"
-#include "Indexes/SimpleAttributeEqualityMatcher.h"
+#include "Indexes/SkiplistIndexAttributeMatcher.h"
 #include "Logger/Logger.h"
 #include "RocksDBEngine/RocksDBCollection.h"
 #include "RocksDBEngine/RocksDBCommon.h"
@@ -99,7 +99,7 @@ bool RocksDBPrimaryIndexEqIterator::next(LocalDocumentIdCallback const& cb, size
     TRI_ASSERT(limit > 0);  // Someone called with limit == 0. Api broken
     return false;
   }
-  
+
   _done = true;
   LocalDocumentId documentId = _index->lookupKey(_trx, StringRef(_key->slice()));
   if (documentId.isSet()) {
@@ -116,7 +116,7 @@ bool RocksDBPrimaryIndexEqIterator::nextCovering(DocumentCallback const& cb, siz
     TRI_ASSERT(limit > 0);  // Someone called with limit == 0. Api broken
     return false;
   }
-  
+
   _done = true;
   LocalDocumentId documentId = _index->lookupKey(_trx, StringRef(_key->slice()));
   if (documentId.isSet()) {
@@ -154,7 +154,7 @@ bool RocksDBPrimaryIndexInIterator::next(LocalDocumentIdCallback const& cb, size
     TRI_ASSERT(limit > 0);  // Someone called with limit == 0. Api broken
     return false;
   }
-  
+
   while (limit > 0) {
     LocalDocumentId documentId = _index->lookupKey(_trx, StringRef(*_iterator));
     if (documentId.isSet()) {
@@ -178,7 +178,7 @@ bool RocksDBPrimaryIndexInIterator::nextCovering(DocumentCallback const& cb, siz
     TRI_ASSERT(limit > 0);  // Someone called with limit == 0. Api broken
     return false;
   }
-  
+
   while (limit > 0) {
     // TODO: prevent copying of the value into result, as we don't need it here!
     LocalDocumentId documentId = _index->lookupKey(_trx, StringRef(*_iterator));
@@ -300,7 +300,7 @@ LocalDocumentId RocksDBPrimaryIndex::lookupKey(transaction::Methods* trx,
   return RocksDBValue::documentId(val);
 }
 
-/// @brief reads a revision id from the primary index 
+/// @brief reads a revision id from the primary index
 /// if the document does not exist, this function will return false
 /// if the document exists, the function will return true
 /// the revision id will only be non-zero if the primary index
@@ -325,7 +325,7 @@ bool RocksDBPrimaryIndex::lookupRevision(transaction::Methods* trx,
   if (!s.ok()) {
     return false;
   }
-  
+
   documentId = RocksDBValue::documentId(val);
 
   // this call will populate revisionId if the revision id value is
@@ -365,7 +365,7 @@ Result RocksDBPrimaryIndex::insertInternal(
   val.Reset(); // clear used memory
 
   blackListKey(key->string().data(), static_cast<uint32_t>(key->string().size()));
-  
+
   TRI_voc_rid_t revision = transaction::helpers::extractRevFromDocument(slice);
   auto value = RocksDBValue::PrimaryIndexValue(documentId, revision);
 
@@ -441,9 +441,18 @@ bool RocksDBPrimaryIndex::supportsFilterCondition(
     arangodb::aql::AstNode const* node,
     arangodb::aql::Variable const* reference, size_t itemsInIndex,
     size_t& estimatedItems, double& estimatedCost) const {
-  SimpleAttributeEqualityMatcher matcher(IndexAttributes);
-  return matcher.matchOne(this, node, reference, itemsInIndex, estimatedItems,
-                          estimatedCost);
+
+  std::unordered_map<size_t, std::vector<arangodb::aql::AstNode const*>> found;
+  std::unordered_set<std::string> nonNullAttributes;
+
+  std::size_t values = 0; // TODO - delete if setting estimatedItems is ok
+
+  SkiplistIndexAttributeMatcher::matchAttributes(this, node, reference,
+      found, values, nonNullAttributes, /*skip evaluation (during execution)*/ false);
+
+  estimatedItems = values; // TODO - check if this ok -- if no reviewer can tell from memory
+
+  return !found.empty();
 }
 
 /// @brief creates an IndexIterator for the given Condition
@@ -471,8 +480,8 @@ IndexIterator* RocksDBPrimaryIndex::iteratorForCondition(
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_EQ) {
     // a.b == value
     return createEqIterator(trx, attrNode, valNode);
-  } 
-  
+  }
+
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_IN) {
     // a.b IN values
     if (valNode->isArray()) {
@@ -489,8 +498,9 @@ IndexIterator* RocksDBPrimaryIndex::iteratorForCondition(
 arangodb::aql::AstNode* RocksDBPrimaryIndex::specializeCondition(
     arangodb::aql::AstNode* node,
     arangodb::aql::Variable const* reference) const {
-  SimpleAttributeEqualityMatcher matcher(IndexAttributes);
-  return matcher.specializeOne(this, node, reference);
+
+  return SkiplistIndexAttributeMatcher::specializeCondition(this, node, reference);
+
 }
 
 /// @brief create the iterator, for a single attribute, IN operator
@@ -547,13 +557,13 @@ IndexIterator* RocksDBPrimaryIndex::createEqIterator(
   TRI_IF_FAILURE("PrimaryIndex::noIterator") {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
   }
-  
+
   if (!key->isEmpty()) {
     return new RocksDBPrimaryIndexEqIterator(
       &_collection, trx, this, std::move(key), !isId
     );
   }
-      
+
   return new EmptyIndexIterator(&_collection, trx);
 }
 

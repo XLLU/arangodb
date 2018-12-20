@@ -29,6 +29,7 @@
 #include "Basics/Exceptions.h"
 #include "Basics/Result.h"
 #include "Basics/StringRef.h"
+#include "Basics/StaticStrings.h"
 #include "VocBase/LocalDocumentId.h"
 #include "VocBase/voc-types.h"
 #include "VocBase/vocbase.h"
@@ -152,13 +153,18 @@ class Index {
     return false;
   }
 
+
   /// @brief whether or not any attribute is expanded
   inline bool attributeMatches(
-      std::vector<arangodb::basics::AttributeName> const& attribute) const {
+      std::vector<arangodb::basics::AttributeName> const& attribute, bool isPrimary = false) const {
     for (auto const& it : _fields) {
       if (arangodb::basics::AttributeName::isIdentical(attribute, it, true)) {
         return true;
       }
+    }
+    if(isPrimary){
+      static std::vector<arangodb::basics::AttributeName> const vec_id {{ StaticStrings::IdString, false }};
+      return arangodb::basics::AttributeName::isIdentical(attribute, vec_id, true);
     }
     return false;
   }
@@ -253,7 +259,7 @@ class Index {
   /// attribute attribute, a Slice would be more flexible.
   virtual double selectivityEstimate(
       arangodb::StringRef const& extra = arangodb::StringRef()) const;
-  
+
   /// @brief update the cluster selectivity estimate
   virtual void updateClusterSelectivityEstimate(double /*estimate*/) {
     TRI_ASSERT(false); // should never be called except on Coordinator
@@ -345,7 +351,7 @@ class Index {
   virtual bool supportsSortCondition(arangodb::aql::SortCondition const*,
                                      arangodb::aql::Variable const*, size_t,
                                      double&, size_t&) const;
-  
+
   virtual arangodb::aql::AstNode* specializeCondition(arangodb::aql::AstNode*,
                                                       arangodb::aql::Variable const*) const;
 
@@ -399,6 +405,9 @@ class Index {
 
   mutable bool _unique;
   mutable bool _sparse;
+
+  //use this with c++17  --  attributeMatches
+  //static inline std::vector<arangodb::basics::AttributeName> const vec_id {{ StaticStrings::IdString, false }};
 };
 }
 

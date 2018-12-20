@@ -51,6 +51,7 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
 
   arangodb::aql::AstNode const* what = access;
   std::pair<arangodb::aql::Variable const*, std::vector<arangodb::basics::AttributeName>> attributeData;
+  bool isPrimaryIndex = idx->type() == arangodb::Index::IndexType::TRI_IDX_TYPE_PRIMARY_INDEX;
 
   if (op->type != arangodb::aql::NODE_TYPE_OPERATOR_BINARY_IN) {
     if (!what->isAttributeAccessForVariable(attributeData) ||
@@ -74,15 +75,15 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
     if (what->isAttributeAccessForVariable(attributeData) &&
         attributeData.first == reference &&
         !arangodb::basics::TRI_AttributeNamesHaveExpansion(attributeData.second) &&
-        idx->attributeMatches(attributeData.second)) {
+        idx->attributeMatches(attributeData.second, isPrimaryIndex)) {
       // doc.value IN 'value'
       // can use this index
     } else if (other->isAttributeAccessForVariable(attributeData) &&
                attributeData.first == reference &&
                idx->isAttributeExpanded(attributeData.second) &&
-               idx->attributeMatches(attributeData.second)) {
-               // check for  'value' IN doc.value  AND  'value' IN doc.value[*]
-               //what = other; // if what should be used later
+               idx->attributeMatches(attributeData.second, isPrimaryIndex)) {
+       // check for  'value' IN doc.value  AND  'value' IN doc.value[*]
+       what = other; // if what should be used later
     } else {
       return false;
     }
@@ -106,12 +107,11 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
 
     // make exception for primary index as we do not need to match "_key, _id"
     // but can go directly for "_id"
-    if(! match &&
-       idx->type() == arangodb::Index::IndexType::TRI_IDX_TYPE_PRIMARY_INDEX &&
-       i == 0 &&
-       fieldNames[i].name == StaticStrings::IdString) {
-      match = true;
-    }
+    if(! match && isPrimaryIndex ) {
+       if (i == 0 && fieldNames[i].name == StaticStrings::IdString) {
+          match = true;
+       }
+    };
 
     if (match) {
       // mark ith attribute as being covered

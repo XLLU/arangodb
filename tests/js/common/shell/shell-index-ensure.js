@@ -678,7 +678,7 @@ function ensureIndexSuite() {
       var found = false;
       st.explain().plan.nodes.forEach(function(node) {
         if (node.type === "IndexNode") {
-          assertTrue([ "skiplist", "primary"].includes(node.indexes[0].type), node.indexes[0].type + " is not in [ 'skiplist', 'primary']")
+          assertTrue([ "skiplist", "primary" ].includes(node.indexes[0].type), node.indexes[0].type + " is not in [ 'skiplist', 'primary' ]");
           found = true;
         }
       });

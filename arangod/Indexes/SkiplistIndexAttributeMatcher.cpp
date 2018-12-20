@@ -27,6 +27,7 @@
 #include "Aql/SortCondition.h"
 #include "Aql/Variable.h"
 #include "Basics/StringRef.h"
+#include "Basics/StaticStrings.h"
 #include "Indexes/Index.h"
 #include "Indexes/SimpleAttributeEqualityMatcher.h"
 #include "VocBase/vocbase.h"
@@ -101,8 +102,16 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
       continue;
     }
 
-    bool match = arangodb::basics::AttributeName::isIdentical(idx->fields()[i],
-                                                              fieldNames, true);
+    bool match = arangodb::basics::AttributeName::isIdentical(idx->fields()[i], fieldNames, true);
+
+    // make exception for primary index as we do not need to match "_key, _id"
+    // but can go directly for "_id"
+    if(! match &&
+       idx->type() == arangodb::Index::IndexType::TRI_IDX_TYPE_PRIMARY_INDEX &&
+       i == 0 &&
+       fieldNames[i].name == StaticStrings::IdString) {
+      match = true;
+    }
 
     if (match) {
       // mark ith attribute as being covered

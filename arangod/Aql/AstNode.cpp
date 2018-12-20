@@ -374,11 +374,11 @@ AstNode::AstNode(AstNodeType type)
   value.type = VALUE_TYPE_NULL;
 }
 
-/// @brief create a node, with defining a value 
+/// @brief create a node, with defining a value
 AstNode::AstNode(AstNodeValue value)
-    : type(NODE_TYPE_VALUE), 
+    : type(NODE_TYPE_VALUE),
       flags(makeFlags(DETERMINED_CONSTANT, VALUE_CONSTANT, DETERMINED_SIMPLE, VALUE_SIMPLE, DETERMINED_RUNONDBSERVER, VALUE_RUNONDBSERVER)),
-      value(value), 
+      value(value),
       computedValue(nullptr) {}
 
 /// @brief create the node from VPack
@@ -673,7 +673,7 @@ AstNode::AstNode(std::function<void(AstNode*)> const& registerNode,
     case NODE_TYPE_DIRECTION:
     case NODE_TYPE_COLLECTION_LIST:
     case NODE_TYPE_PASSTHRU:
-    case NODE_TYPE_WITH: 
+    case NODE_TYPE_WITH:
     case NODE_TYPE_FOR_VIEW: {
       THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                                      "Unsupported node type");
@@ -818,27 +818,28 @@ uint64_t AstNode::hashValue(uint64_t hash) const noexcept {
 
 /// @brief dump the node (for debugging purposes)
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
-void AstNode::dump(int level) const {
+std::ostream& AstNode::toStream(std::ostream& os, int level) const {
   for (int i = 0; i < level; ++i) {
-    std::cout << "  ";
+    os << "  ";
   }
-  std::cout << "- " << getTypeString();
+  os << "- " << getTypeString();
 
   if (type == NODE_TYPE_VALUE || type == NODE_TYPE_ARRAY) {
-    std::cout << ": " << toVelocyPackValue().get()->toJson();
+    os << ": " << toVelocyPackValue().get()->toJson();
   } else if (type == NODE_TYPE_ATTRIBUTE_ACCESS) {
-    std::cout << ": " << getString();
+    os << ": " << getString();
   } else if (type == NODE_TYPE_REFERENCE) {
-    std::cout << ": " << static_cast<Variable const*>(getData())->name;
+    os << ": " << static_cast<Variable const*>(getData())->name;
   }
-  std::cout << "\n";
+  os << "\n";
 
   size_t const n = numMembers();
 
   for (size_t i = 0; i < n; ++i) {
     auto sub = getMemberUnchecked(i);
-    sub->dump(level + 1);
+    sub->toStream(os, level + 1);
   }
+  return os;
 }
 #endif
 
@@ -854,7 +855,7 @@ VPackSlice AstNode::computeValue() const {
     computedValue = new uint8_t[builder.size()];
     memcpy(computedValue, builder.data(), builder.size());
   }
-  
+
   TRI_ASSERT(computedValue != nullptr);
 
   return VPackSlice(computedValue);
@@ -1037,7 +1038,7 @@ void AstNode::toVelocyPack(VPackBuilder& builder, bool verbose) const {
   }
   if (type == NODE_TYPE_COLLECTION || type == NODE_TYPE_VIEW ||
       type == NODE_TYPE_PARAMETER || type == NODE_TYPE_PARAMETER_DATASOURCE ||
-      type == NODE_TYPE_ATTRIBUTE_ACCESS || 
+      type == NODE_TYPE_ATTRIBUTE_ACCESS ||
       type == NODE_TYPE_OBJECT_ELEMENT || type == NODE_TYPE_FCALL_USER) {
     // dump "name" of node
     TRI_ASSERT(getStringValue() != nullptr);
@@ -1065,7 +1066,7 @@ void AstNode::toVelocyPack(VPackBuilder& builder, bool verbose) const {
       builder.add("vTypeID", VPackValue(static_cast<int>(value.type)));
     }
   }
-  
+
   if (type == NODE_TYPE_OPERATOR_BINARY_LT ||
       type == NODE_TYPE_OPERATOR_BINARY_LE ||
       type == NODE_TYPE_OPERATOR_BINARY_EQ) {
@@ -1192,7 +1193,7 @@ AstNode const* AstNode::castToNumber(Ast* ast) const {
         return this;
       case VALUE_TYPE_STRING: {
         bool failed;
-        double v = arangodb::aql::stringToNumber(std::string(value.value._string, value.length), failed);  
+        double v = arangodb::aql::stringToNumber(std::string(value.value._string, value.length), failed);
         if (failed) {
           return ast->createNodeValueInt(0);
         }
@@ -1802,7 +1803,7 @@ bool AstNode::isDeterministic() const {
   if (type == NODE_TYPE_FCALL) {
     // built-in functions may or may not be deterministic
     auto func = static_cast<Function*>(getData());
-    
+
     if (!func->hasFlag(Function::Flags::Deterministic)) {
       setFlag(DETERMINED_NONDETERMINISTIC, VALUE_NONDETERMINISTIC);
       return false;
@@ -2158,7 +2159,7 @@ void AstNode::stringify(arangodb::basics::StringBuffer* buffer, bool verbose,
     getMember(1)->stringify(buffer, verbose, failIfLong);
     return;
   }
-  
+
   if (type == NODE_TYPE_OPERATOR_BINARY_ARRAY_EQ ||
       type == NODE_TYPE_OPERATOR_BINARY_ARRAY_NE ||
       type == NODE_TYPE_OPERATOR_BINARY_ARRAY_LT ||
@@ -2190,7 +2191,7 @@ void AstNode::stringify(arangodb::basics::StringBuffer* buffer, bool verbose,
     getMember(2)->stringify(buffer, verbose, failIfLong);
     return;
   }
-  
+
   if (type == NODE_TYPE_OPERATOR_NARY_AND ||
       type == NODE_TYPE_OPERATOR_NARY_OR) {
     // not used by V8

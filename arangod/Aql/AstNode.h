@@ -31,6 +31,9 @@
 #include <velocypack/Slice.h>
 
 #include <iosfwd>
+#ifdef ARANGODB_ENABLE_MAINTAINER_MODE
+#include <iostream>
+#endif
 
 namespace arangodb {
 namespace velocypack {
@@ -71,7 +74,7 @@ enum AstNodeFlagType : AstNodeFlagsType {
   FLAG_BIND_PARAMETER =          0x0020000,  // node was created from a bind parameter
   FLAG_FINALIZED =               0x0040000,  // node has been finalized and should not be modified; only set and checked in maintainer mode
 };
-  
+
 /// @brief enumeration of AST node value types
 /// note: these types must be declared in asc. sort order
 enum AstNodeValueType : uint8_t {
@@ -106,11 +109,11 @@ struct AstNodeValue {
     explicit Value(bool value) : _bool(value) {}
     explicit Value(char const* value) : _string(value) {}
   };
-  
+
   Value value;
   uint32_t length;  // only used for string values
   AstNodeValueType type;
-  
+
   AstNodeValue() : value(int64_t(0)), length(0), type(VALUE_TYPE_NULL) {}
   explicit AstNodeValue(int64_t value) : value(value), length(0), type(VALUE_TYPE_INT) {}
   explicit AstNodeValue(double value) : value(value), length(0), type(VALUE_TYPE_DOUBLE) {}
@@ -216,14 +219,14 @@ struct AstNode {
   static inline std::underlying_type<AstNodeFlagType>::type makeFlags(AstNodeFlagType flag, Args... args) {
     return static_cast<std::underlying_type<AstNodeFlagType>::type>(flag) + makeFlags(args...);
   }
-    
+
   static inline std::underlying_type<AstNodeFlagType>::type makeFlags() {
     return static_cast<std::underlying_type<AstNodeFlagType>::type>(0);
   }
 
   /// @brief create the node
   explicit AstNode(AstNodeType);
-  
+
   /// @brief create a node, with defining a value
   explicit AstNode(AstNodeValue value);
 
@@ -253,7 +256,10 @@ struct AstNode {
 
 /// @brief dump the node (for debugging purposes)
 #ifdef ARANGODB_ENABLE_MAINTAINER_MODE
-  void dump(int indent) const;
+  std::ostream& toStream(std::ostream& os, int indent) const;
+  void dump(int indent) const {
+    toStream(std::cout, indent);
+  }
 #endif
 
   /// @brief compute the value for a constant value node
@@ -329,7 +335,7 @@ struct AstNode {
                       AstNodeFlagType valueFlag) const {
     flags |= (typeFlag | valueFlag);
   }
-  
+
   /// @brief remove a flag for the node
   inline void removeFlag(AstNodeFlagType flag) const {
     flags &= ~flag;
@@ -467,7 +473,7 @@ struct AstNode {
   /// @brief whether or not a node has a constant value
   /// this may also set the FLAG_CONSTANT or the FLAG_DYNAMIC flags for the node
   bool isConstant() const;
-  
+
   /// @brief whether or not a node will use V8 internally
   /// this may also set the FLAG_V8 flag for the node
   bool willUseV8() const;
@@ -552,7 +558,7 @@ struct AstNode {
     TRI_ASSERT(!hasFlag(AstNodeFlagType::FLAG_FINALIZED));
     members.erase(members.begin() + i);
   }
-  
+
   /// @brief remove all members from the node at once
   void removeMembers() {
     TRI_ASSERT(!hasFlag(AstNodeFlagType::FLAG_FINALIZED));
@@ -592,21 +598,21 @@ struct AstNode {
     TRI_ASSERT(!hasFlag(AstNodeFlagType::FLAG_FINALIZED));
     members.clear();
   }
-  
+
   /// @brief mark a < or <= operator to definitely exclude the "null" value
   /// this is only for optimization purposes
   inline void setExcludesNull(bool v = true) {
-    TRI_ASSERT(type == NODE_TYPE_OPERATOR_BINARY_LT || 
-               type == NODE_TYPE_OPERATOR_BINARY_LE || 
+    TRI_ASSERT(type == NODE_TYPE_OPERATOR_BINARY_LT ||
+               type == NODE_TYPE_OPERATOR_BINARY_LE ||
                type == NODE_TYPE_OPERATOR_BINARY_EQ);
     value.value._bool = v;
   }
-  
+
   /// @brief check if an < or <= operator definitely excludes the "null" value
   /// this is only for optimization purposes
   inline bool getExcludesNull() const noexcept {
-    TRI_ASSERT(type == NODE_TYPE_OPERATOR_BINARY_LT || 
-               type == NODE_TYPE_OPERATOR_BINARY_LE || 
+    TRI_ASSERT(type == NODE_TYPE_OPERATOR_BINARY_LT ||
+               type == NODE_TYPE_OPERATOR_BINARY_LE ||
                type == NODE_TYPE_OPERATOR_BINARY_EQ);
     return value.value._bool;
   }
@@ -702,7 +708,7 @@ struct AstNode {
 
   /// @brief clone a node, recursively
   AstNode* clone(Ast*) const;
-  
+
   /// @brief validate that given node is an object with const-only values
   bool isConstObject() const;
 

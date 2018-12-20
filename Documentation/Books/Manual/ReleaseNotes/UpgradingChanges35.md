@@ -10,8 +10,10 @@ The following incompatible changes have been made in ArangoDB 3.5:
 UI
 --
 
-Numerical primary index keys will be sorted in lexicographical order,
-when shown in the UI (e.g "10" < "9").
+Primary index keys will now always be sorted in lexicographical order as keys are
+strings. An exception for values representing numerical values has been removed
+when shown in the UI. Therefore a key with value "10" will be displayed before
+a key having "9" as value.
 
 AQL
 ---

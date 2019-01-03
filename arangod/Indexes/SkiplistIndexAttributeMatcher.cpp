@@ -46,7 +46,10 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
     std::unordered_set<std::string>& nonNullAttributes,  // set of stringified op-childeren (access other) that may not be null
     bool isExecution  // skip usage check in execution phase
 ) {
+  LOG_DEVEL << "--->";
   if (!idx->canUseConditionPart(access, other, op, reference, nonNullAttributes, isExecution)) {
+    LOG_DEVEL << "index can not use condition part";
+    LOG_DEVEL << "<---";
     return false;
   }
 
@@ -57,16 +60,19 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
     if (!what->isAttributeAccessForVariable(attributeData) || attributeData.first != reference) {
       // this access is not referencing this collection
       LOG_DEVEL << "exit 1";
+      LOG_DEVEL << "<---";
       return false;
     }
     if (arangodb::basics::TRI_AttributeNamesHaveExpansion(attributeData.second)) {
       // doc.value[*] == 'value'
       LOG_DEVEL << "exit 2";
+      LOG_DEVEL << "<---";
       return false;
     }
     if (idx->isAttributeExpanded(attributeData.second)) {
       // doc.value == 'value' (with an array index)
       LOG_DEVEL << "exit 3";
+      LOG_DEVEL << "<---";
       return false;
     }
   } else {
@@ -87,6 +93,7 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
       what = other;  // if what should be used later
     } else {
       LOG_DEVEL << "exit 4";
+      LOG_DEVEL << "<---";
       return false;
     }
   }
@@ -153,11 +160,14 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
         THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
       }
 
+    LOG_DEVEL << "match !! " << idx->fields()[i];
+      LOG_DEVEL << "<---";
       return true;
     }
   }
 
   LOG_DEVEL << "no match :(";
+  LOG_DEVEL << "<---";
   return false;
 }
 

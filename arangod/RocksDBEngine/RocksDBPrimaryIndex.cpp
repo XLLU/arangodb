@@ -552,7 +552,7 @@ void RocksDBPrimaryIndex::handleValNode(transaction::Methods* trx, VPackBuilder*
     return;
   }
 
-  LOG_DEVEL << "handleValNode " << std::boolalpha << isId;
+  LOG_DEVEL << "handleValNode - isId" << std::boolalpha << isId << arangodb::aql::AstNode::toString(valNode);
 
   if (isId) {
     // lookup by _id. now validate if the lookup is performed for the
@@ -593,7 +593,7 @@ void RocksDBPrimaryIndex::handleValNode(transaction::Methods* trx, VPackBuilder*
         }
       } else
 #endif
-          if (collection->planId() != _collection.planId()) {
+      if (collection->planId() != _collection.planId()) {
         // only continue lookup if the id value is syntactically correct and
         // refers to "our" collection, using cluster collection id
         return;

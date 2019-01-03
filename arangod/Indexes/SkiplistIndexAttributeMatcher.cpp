@@ -42,7 +42,7 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
     arangodb::aql::AstNode const* other,   // eg const value
     arangodb::aql::AstNode const* op,  // binary operation that is parent of access and other
     arangodb::aql::Variable const* reference,  // variable used in access(es)
-    std::unordered_map<size_t /*offset in idx->fields()*/, std::vector<arangodb::aql::AstNode const*> /*conjunct - operation*/>& found,  // marks operatins covered by index-fields
+    std::unordered_map<size_t /*offset in idx->fields()*/, std::vector<arangodb::aql::AstNode const*> /*conjunct - operation*/>& found,  // marks operations covered by index-fields
     std::unordered_set<std::string>& nonNullAttributes,  // set of stringified op-childeren (access other) that may not be null
     bool isExecution  // skip usage check in execution phase
 ) {
@@ -115,10 +115,10 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
       if (i == 0 && fieldNames[i].name == StaticStrings::IdString) {
         LOG_DEVEL << "accept _id";
         match = true;
-      } else if (i == 0 && (fieldNames[i].name == StaticStrings::FromString ||
-                            fieldNames[i].name == StaticStrings::ToString)) {
-        LOG_DEVEL << "accept _from/_to";
-        match = true;
+      //} else if (i == 0 && (fieldNames[i].name == StaticStrings::FromString ||
+      //                      fieldNames[i].name == StaticStrings::ToString)) {
+      //  LOG_DEVEL << "accept _from/_to";
+      //  match = true;
       } else {
         // Debug
         std::stringstream ss;
@@ -495,6 +495,10 @@ arangodb::aql::AstNode* SkiplistIndexAttributeMatcher::specializeCondition(
     TRI_ASSERT(it->type != arangodb::aql::NODE_TYPE_OPERATOR_BINARY_NE);
     node->addMember(it);
   }
+
+  LOG_DEVEL_IF(node) << "specializeCondition result node: " << arangodb::aql::AstNode::toString(node);
+  LOG_DEVEL_IF(!node) << "specializeCondition result node: is nullptr";
+
   return node;
 }
 

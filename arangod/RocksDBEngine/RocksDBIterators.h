@@ -25,8 +25,8 @@
 
 #include "Indexes/Index.h"
 #include "Indexes/IndexIterator.h"
-#include "RocksDBEngine/RocksDBKeyBounds.h"
 #include "RocksDBEngine/RocksDBColumnFamily.h"
+#include "RocksDBEngine/RocksDBKeyBounds.h"
 
 #include <velocypack/Iterator.h>
 #include <velocypack/Slice.h>
@@ -35,7 +35,7 @@ namespace rocksdb {
 class Iterator;
 class Comparator;
 class TransactionDB;
-}
+}  // namespace rocksdb
 
 namespace arangodb {
 class RocksDBCollection;
@@ -48,8 +48,7 @@ typedef std::function<bool(rocksdb::Slice const& key, rocksdb::Slice const& valu
 /// basically sorted after LocalDocumentId
 class RocksDBAllIndexIterator final : public IndexIterator {
  public:
-  RocksDBAllIndexIterator(LogicalCollection* collection,
-                          transaction::Methods* trx,
+  RocksDBAllIndexIterator(LogicalCollection* collection, transaction::Methods* trx,
                           RocksDBPrimaryIndex const* index);
   ~RocksDBAllIndexIterator() {}
 
@@ -66,16 +65,14 @@ class RocksDBAllIndexIterator final : public IndexIterator {
 
  private:
   RocksDBKeyBounds const _bounds;
-  rocksdb::Slice _upperBound; // used for iterate_upper_bound
+  rocksdb::Slice _upperBound;  // used for iterate_upper_bound
   std::unique_ptr<rocksdb::Iterator> _iterator;
   rocksdb::Comparator const* _cmp;
 };
 
-
 class RocksDBAnyIndexIterator final : public IndexIterator {
  public:
-  RocksDBAnyIndexIterator(LogicalCollection* collection,
-                          transaction::Methods* trx,
+  RocksDBAnyIndexIterator(LogicalCollection* collection, transaction::Methods* trx,
                           RocksDBPrimaryIndex const* index);
 
   ~RocksDBAnyIndexIterator() {}
@@ -103,8 +100,7 @@ class RocksDBAnyIndexIterator final : public IndexIterator {
 class RocksDBGenericIterator {
  public:
   RocksDBGenericIterator(rocksdb::ReadOptions& options,
-                         RocksDBKeyBounds const& bounds,
-                         bool reverse = false);
+                         RocksDBKeyBounds const& bounds, bool reverse = false);
   RocksDBGenericIterator(RocksDBGenericIterator&&) = default;
 
   ~RocksDBGenericIterator() {}
@@ -135,5 +131,5 @@ class RocksDBGenericIterator {
 
 RocksDBGenericIterator createPrimaryIndexIterator(transaction::Methods* trx,
                                                   LogicalCollection* col);
-} //namespace arangodb
+}  // namespace arangodb
 #endif

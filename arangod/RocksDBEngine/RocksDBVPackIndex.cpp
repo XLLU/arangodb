@@ -1247,13 +1247,13 @@ void RocksDBVPackIndex::recalculateEstimates() {
   if (unique()) {
     return;
   }
-  
+
   TRI_ASSERT(_estimator != nullptr);
   _estimator->clear();
-  
+
   rocksdb::TransactionDB* db = rocksutils::globalRocksDB();
   rocksdb::SequenceNumber seq = db->GetLatestSequenceNumber();
-  
+
   auto bounds = getBounds();
   rocksdb::Slice const end = bounds.end();
   rocksdb::ReadOptions options;

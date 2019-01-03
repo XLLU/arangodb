@@ -32,6 +32,8 @@
 #include "Indexes/SimpleAttributeEqualityMatcher.h"
 #include "VocBase/vocbase.h"
 
+#include "Logger/Logger.h"
+
 using namespace arangodb;
 
 bool SkiplistIndexAttributeMatcher::accessFitsIndex(
@@ -57,14 +59,17 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
     if (!what->isAttributeAccessForVariable(attributeData) ||
         attributeData.first != reference) {
       // this access is not referencing this collection
+      LOG_DEVEL << "exit 1";
       return false;
     }
     if (arangodb::basics::TRI_AttributeNamesHaveExpansion(attributeData.second)) {
       // doc.value[*] == 'value'
+      LOG_DEVEL << "exit 2";
       return false;
     }
     if (idx->isAttributeExpanded(attributeData.second)) {
       // doc.value == 'value' (with an array index)
+      LOG_DEVEL << "exit 3";
       return false;
     }
   } else {
@@ -85,6 +90,7 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
        // check for  'value' IN doc.value  AND  'value' IN doc.value[*]
        what = other; // if what should be used later
     } else {
+      LOG_DEVEL << "exit 4";
       return false;
     }
   }
@@ -94,12 +100,14 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
   for (size_t i = 0; i < idx->fields().size(); ++i) {
     if (idx->fields()[i].size() != fieldNames.size()) {
       // attribute path length differs
+      LOG_DEVEL << "exit at attriubte path length check";
       continue;
     }
 
     if (idx->isAttributeExpanded(i) &&
         op->type != arangodb::aql::NODE_TYPE_OPERATOR_BINARY_IN) {
       // If this attribute is correct or not, it could only serve for IN
+      LOG_DEVEL << "exit at expanded check";
       continue;
     }
 
@@ -109,7 +117,30 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
     // but can go directly for "_id"
     if(! match && isPrimaryIndex ) {
        if (i == 0 && fieldNames[i].name == StaticStrings::IdString) {
+          LOG_DEVEL << "accept _id";
           match = true;
+       } else if (i == 0 && ( fieldNames[i].name == StaticStrings::FromString || fieldNames[i].name == StaticStrings::ToString)) {
+          LOG_DEVEL << "accept _from/_to";
+          match = true;
+       } else {
+
+         // Debug
+         std::stringstream ss;
+         std::size_t i = 0;
+
+         for(auto const& vec : idx->fields()) {
+           ss << "idx fields " << i << ":";
+           for(auto const& item : vec) {
+             ss << " " << item.name;
+           }
+         }
+
+         ss << "  fieldnames:";
+         for(auto const& i : fieldNames) {
+           ss << " " << i.name;
+         }
+
+         LOG_DEVEL << ss.rdbuf();
        }
     };
 
@@ -130,6 +161,7 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
     }
   }
 
+  LOG_DEVEL << "no match :(";
   return false;
 }
 

@@ -94,7 +94,7 @@ class RocksDBAnyIndexIterator final : public IndexIterator {
   std::unique_ptr<rocksdb::Iterator> _iterator;
   uint64_t const _objectId;
   RocksDBKeyBounds const _bounds;
-  
+
   uint64_t _total;
   uint64_t _returned;
   bool _forward;
@@ -109,9 +109,9 @@ class RocksDBGenericIterator {
 
   ~RocksDBGenericIterator() {}
 
-  // the following functions return if the iterator
-  // is valid and in bounds on return.
-  bool next(GenericCallback const& cb, size_t count); //number of documents the callback should be applied to
+  //* The following functions returns true if the iterator is valid within bounds on return.
+  //  @param limit - number of documents the callback should be applied to
+  bool next(GenericCallback const& cb, size_t limit);
 
   // documents to skip, skipped documents
   bool skip(uint64_t count, uint64_t& skipped);
@@ -124,7 +124,7 @@ class RocksDBGenericIterator {
 
  private:
   bool outOfRange() const;
-  
+
  private:
   bool _reverse;
   RocksDBKeyBounds const _bounds;

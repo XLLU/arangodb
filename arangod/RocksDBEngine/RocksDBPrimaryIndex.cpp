@@ -450,6 +450,15 @@ bool RocksDBPrimaryIndex::supportsFilterCondition(
   SkiplistIndexAttributeMatcher::matchAttributes(this, node, reference,
       found, values, nonNullAttributes, /*skip evaluation (during execution)*/ false);
 
+  for (auto const& int_ast_vec_pair : found) {
+    std::stringstream ss;
+    ss << "-==- " << int_ast_vec_pair.first;
+    for (auto const& node : int_ast_vec_pair.second){
+      ss << " - " << arangodb::aql::AstNode::toString(node);
+    }
+    LOG_DEVEL << ss.rdbuf() << std::boolalpha << !found.empty();
+  }
+
   estimatedItems = values; // TODO - check if this ok -- if no reviewer can tell from memory
 
   return !found.empty();
@@ -464,6 +473,8 @@ IndexIterator* RocksDBPrimaryIndex::iteratorForCondition(
   TRI_ASSERT(!isSorted() || opts.sorted);
   TRI_ASSERT(node->type == aql::NODE_TYPE_OPERATOR_NARY_AND);
   TRI_ASSERT(node->numMembers() == 1);
+
+  LOG_DEVEL << "iteratorForCondition";
 
   auto comp = node->getMember(0);
   // assume a.b == value
@@ -491,6 +502,7 @@ IndexIterator* RocksDBPrimaryIndex::iteratorForCondition(
   }
 
   // operator type unsupported or IN used on non-array
+  LOG_DEVEL << "EmptyIndexIterator" << comp->getTypeString() ;
   return new EmptyIndexIterator(&_collection, trx);
 }
 
@@ -508,6 +520,7 @@ IndexIterator* RocksDBPrimaryIndex::createInIterator(
     transaction::Methods* trx,
     arangodb::aql::AstNode const* attrNode,
     arangodb::aql::AstNode const* valNode) {
+  LOG_DEVEL << "createInIterator";
   // _key or _id?
   bool const isId = (attrNode->stringEquals(StaticStrings::IdString));
 
@@ -544,6 +557,8 @@ IndexIterator* RocksDBPrimaryIndex::createEqIterator(
     transaction::Methods* trx,
     arangodb::aql::AstNode const* attrNode,
     arangodb::aql::AstNode const* valNode) {
+
+  LOG_DEVEL << "createEqIterator";
   // _key or _id?
   bool const isId = (attrNode->stringEquals(StaticStrings::IdString));
 
@@ -575,6 +590,9 @@ void RocksDBPrimaryIndex::handleValNode(transaction::Methods* trx,
   if (!valNode->isStringValue() || valNode->getStringLength() == 0) {
     return;
   }
+
+  LOG_DEVEL << "handleValNode " << std::boolalpha
+            << isId;
 
   if (isId) {
     // lookup by _id. now validate if the lookup is performed for the

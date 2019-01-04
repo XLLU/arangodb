@@ -122,10 +122,10 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
       if (i == 0 && fieldNames[i].name == StaticStrings::IdString) {
         LOG_DEVEL << "accept _id";
         match = true;
-      //} else if (i == 0 && (fieldNames[i].name == StaticStrings::FromString ||
-      //                      fieldNames[i].name == StaticStrings::ToString)) {
-      //  LOG_DEVEL << "accept _from/_to";
-      //  match = true;
+        //} else if (i == 0 && (fieldNames[i].name == StaticStrings::FromString ||
+        //                      fieldNames[i].name == StaticStrings::ToString)) {
+        //  LOG_DEVEL << "accept _from/_to";
+        //  match = true;
       } else {
         // Debug
         std::stringstream ss;
@@ -160,7 +160,7 @@ bool SkiplistIndexAttributeMatcher::accessFitsIndex(
         THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
       }
 
-    LOG_DEVEL << "match !! " << idx->fields()[i];
+      LOG_DEVEL << "match !! " << idx->fields()[i];
       LOG_DEVEL << "<---";
       return true;
     }
@@ -506,7 +506,8 @@ arangodb::aql::AstNode* SkiplistIndexAttributeMatcher::specializeCondition(
     node->addMember(it);
   }
 
-  LOG_DEVEL_IF(node) << "specializeCondition result node: " << arangodb::aql::AstNode::toString(node);
+  LOG_DEVEL_IF(node) << "specializeCondition result node: "
+                     << arangodb::aql::AstNode::toString(node);
   LOG_DEVEL_IF(!node) << "specializeCondition result node: is nullptr";
 
   return node;

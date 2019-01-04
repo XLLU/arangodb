@@ -63,23 +63,15 @@
 
 using namespace arangodb;
 
-
-
-
-
-
-
-
-RocksDBPrimaryIndexRangeIterator::RocksDBPrimaryIndexRangeIterator(LogicalCollection* collection,
-                                                     transaction::Methods* trx,
-                                                     arangodb::RocksDBPrimaryIndex const* index,
-                                                     bool reverse, RocksDBKeyBounds&& bounds)
+RocksDBPrimaryIndexRangeIterator::RocksDBPrimaryIndexRangeIterator(
+    LogicalCollection* collection, transaction::Methods* trx,
+    arangodb::RocksDBPrimaryIndex const* index, bool reverse, RocksDBKeyBounds&& bounds)
     : IndexIterator(collection, trx),
       _index(index),
       _cmp(index->comparator()),
       _reverse(reverse),
       _bounds(std::move(bounds)) {
-  TRI_ASSERT(index->columnFamily() == RocksDBColumnFamily::vpack());
+  TRI_ASSERT(index->columnFamily() == RocksDBColumnFamily::primary());
 
   RocksDBMethods* mthds = RocksDBTransactionState::toMethods(trx);
   rocksdb::ReadOptions options = mthds->iteratorReadOptions();
@@ -152,7 +144,7 @@ bool RocksDBPrimaryIndexRangeIterator::next(LocalDocumentIdCallback const& cb, s
   return true;
 }
 
-//bool RocksDBPrimaryIndexRangeIterator::nextCovering(DocumentCallback const& cb, size_t limit) {
+// bool RocksDBPrimaryIndexRangeIterator::nextCovering(DocumentCallback const& cb, size_t limit) {
 //  TRI_ASSERT(_trx->state()->isRunning());
 //
 //  if (limit == 0 || !_iterator->Valid() || outOfRange()) {
@@ -207,21 +199,6 @@ void RocksDBPrimaryIndexRangeIterator::skip(uint64_t count, uint64_t& skipped) {
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // ================ Primary Index Iterator ================
 
@@ -612,6 +589,7 @@ IndexIterator* RocksDBPrimaryIndex::iteratorForCondition(
   auto comp = node->getMember(0);
   // assume a.b == value
   auto attrNode = comp->getMember(0);
+  bool const isId = (attrNode->stringEquals(StaticStrings::IdString));
   auto valNode = comp->getMember(1);
 
   if (attrNode->type != aql::NODE_TYPE_ATTRIBUTE_ACCESS) {
@@ -634,26 +612,54 @@ IndexIterator* RocksDBPrimaryIndex::iteratorForCondition(
     }
   }
 
+  // Revert to StringRef to avoid allocations?
+  static std::string const& lowest(StaticStrings::Empty);
+  static std::string const hightest = "\xFF";
+
+  auto value = valNode->getString();
+
+  if (isId) {
+    auto found = value.find('/');
+    if (found != std::string::npos && found < value.size()) {
+      value = std::string(value.data() + found + 1, value.size() - found - 1);
+    }
+  }
+
+  LOG_DEVEL << "##### VALUE:" << value;
+
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_LT) {
     // a.b < value
+    if (value != lowest) {
+      value.back() -= 0x01U;
+    }
 
-    return new RocksDBPrimaryIndexRangeIterator(nullptr, trx, this, false, RocksDBKeyBounds::Empty());
-    return createRangeIterator(trx, attrNode, valNode, true /*isLess*/, false /*allowEquality*/);
+    return new RocksDBPrimaryIndexRangeIterator(
+        &_collection /*logical collection*/, trx, this, false /*reverse*/,
+        RocksDBKeyBounds::PrimaryIndex(_objectId, lowest, value));
   }
 
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_LE) {
     // a.b <= value
-    return createRangeIterator(trx, attrNode, valNode, true /*isLess*/, true /*allowEquality*/);
+    return new RocksDBPrimaryIndexRangeIterator(
+        &_collection /*logical collection*/, trx, this, false /*reverse*/,
+        RocksDBKeyBounds::PrimaryIndex(_objectId, lowest, value));
   }
 
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_GT) {
+    if (value != hightest) {
+      value.back() += 0x01U;
+    }
     // a.b > value
-    return createRangeIterator(trx, attrNode, valNode, false /*isLess*/, false /*allowEquality*/);
+    return new RocksDBPrimaryIndexRangeIterator(
+        &_collection /*logical collection*/, trx, this, false /*reverse*/,
+        RocksDBKeyBounds::PrimaryIndex(_objectId, value, hightest));
   }
 
   if (comp->type == aql::NODE_TYPE_OPERATOR_BINARY_GE) {
     // a.b >= value
-    return createRangeIterator(trx, attrNode, valNode, false /*isLess*/, true /*allowEquality*/);
+    return new RocksDBPrimaryIndexRangeIterator(
+        &_collection /*logical collection*/, trx, this, false /*reverse*/,
+        RocksDBKeyBounds::PrimaryIndex(_objectId, value, hightest));
   }
 
   // operator type unsupported or IN used on non-array
@@ -701,42 +707,6 @@ IndexIterator* RocksDBPrimaryIndex::createInIterator(transaction::Methods* trx,
   return new RocksDBPrimaryIndexInIterator(&_collection, trx, this, std::move(keys), !isId);
 }
 
-/// @brief create the iterator, for a single attribute, LESS operator
-IndexIterator* RocksDBPrimaryIndex::createRangeIterator(transaction::Methods* trx,
-                                                     arangodb::aql::AstNode const* attrNode,
-                                                     arangodb::aql::AstNode const* valNode,
-                                                     bool isLess, bool allowEquality) {
-  LOG_DEVEL << "lessInIterator";
-  // _key or _id?
-  bool const isId = (attrNode->stringEquals(StaticStrings::IdString));
-
-  //// TRI_ASSERT(valNode->isArray());
-
-  //// // lease builder, but immediately pass it to the unique_ptr so we don't leak
-  transaction::BuilderLeaser builder(trx);
-  std::unique_ptr<VPackBuilder> keys(builder.steal());
-  keys->openArray();
-  valNode->dump(16);
-
-  //// size_t const n = valNode->numMembers();
-
-  //// // only leave the valid elements
-  //// for (size_t i = 0; i < n; ++i) {
-  ////   handleValNode(trx, keys.get(), valNode->getMemberUnchecked(i), isId);
-  ////   TRI_IF_FAILURE("PrimaryIndex::iteratorValNodes") {
-  ////     THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
-  ////   }
-  //// }
-
-  //// TRI_IF_FAILURE("PrimaryIndex::noIterator") {
-  ////   THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
-  //// }
-
-  keys->close();
-
-  return new RocksDBPrimaryIndexInIterator(&_collection, trx, this, std::move(keys), !isId);
-}
-
 /// @brief create the iterator, for a single attribute, EQ operator
 IndexIterator* RocksDBPrimaryIndex::createEqIterator(transaction::Methods* trx,
                                                      arangodb::aql::AstNode const* attrNode,
@@ -771,7 +741,8 @@ void RocksDBPrimaryIndex::handleValNode(transaction::Methods* trx, VPackBuilder*
     return;
   }
 
-  LOG_DEVEL << "handleValNode - isId" << std::boolalpha << isId << arangodb::aql::AstNode::toString(valNode);
+  LOG_DEVEL << "handleValNode - isId" << std::boolalpha << isId
+            << arangodb::aql::AstNode::toString(valNode);
 
   if (isId) {
     // lookup by _id. now validate if the lookup is performed for the
@@ -812,7 +783,7 @@ void RocksDBPrimaryIndex::handleValNode(transaction::Methods* trx, VPackBuilder*
         }
       } else
 #endif
-      if (collection->planId() != _collection.planId()) {
+          if (collection->planId() != _collection.planId()) {
         // only continue lookup if the id value is syntactically correct and
         // refers to "our" collection, using cluster collection id
         return;

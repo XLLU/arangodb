@@ -109,8 +109,8 @@ class RocksDBPrimaryIndexRangeIterator final : public IndexIterator {
 
  public:
   RocksDBPrimaryIndexRangeIterator(LogicalCollection* collection, transaction::Methods* trx,
-                            arangodb::RocksDBPrimaryIndex const* index,
-                            bool reverse, RocksDBKeyBounds&& bounds);
+                                   arangodb::RocksDBPrimaryIndex const* index,
+                                   bool reverse, RocksDBKeyBounds&& bounds);
 
   ~RocksDBPrimaryIndexRangeIterator() = default;
 
@@ -120,7 +120,6 @@ class RocksDBPrimaryIndexRangeIterator final : public IndexIterator {
   /// @brief Get the next limit many elements in the index
   bool next(LocalDocumentIdCallback const& cb, size_t limit) override;
 
-
   void skip(uint64_t count, uint64_t& skipped) override;
 
   /// @brief Reset the cursor
@@ -129,7 +128,7 @@ class RocksDBPrimaryIndexRangeIterator final : public IndexIterator {
   /// @brief we provide a method to provide the index attribute values
   /// while scanning the index
   bool hasCovering() const override { return false; }
-  //bool nextCovering(DocumentCallback const& cb, size_t limit) override;
+  // bool nextCovering(DocumentCallback const& cb, size_t limit) override;
 
  private:
   bool outOfRange() const;
@@ -229,9 +228,6 @@ class RocksDBPrimaryIndex final : public RocksDBIndex {
   /// @brief create the iterator, for a single attribute, EQ operator
   IndexIterator* createEqIterator(transaction::Methods*, arangodb::aql::AstNode const*,
                                   arangodb::aql::AstNode const*);
-
-  IndexIterator* createRangeIterator(transaction::Methods*, arangodb::aql::AstNode const*,
-                                  arangodb::aql::AstNode const*, bool isLess, bool allowEquality);
 
   /// @brief add a single value node to the iterator's keys
   void handleValNode(transaction::Methods* trx, VPackBuilder* keys,
